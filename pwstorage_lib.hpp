@@ -333,22 +333,31 @@ int AddCounterProperty(char *pPlayer, char *wrapper)
 //---------------------------------------------------------------------------------------------------------------------------
 int DeadrakyCommandHandler(gplayer_controller *pCtrl, int cmd_type, unsigned char* buf, size_t size)
 {
-	if(!pCtrl && !buf) return 0;
-	int roleid = pCtrl->GetImp()->GetPlayerID();
-	
-	printf("New Command Handler: roleid = %d, cmd = %d , size = %d \n", roleid, cmd_type, size);
-	if(cmd_type == 711 && size == 10)
-	{
-		int idx = storage_get_roleid(roleid);
-		if(idx == -1) return 0;
-		int64_t hw = *(int64_t*)&buf[2];
-		storage.at(idx).hwid = hw;
-		lua_EventPlayerSetHwid(roleid,hw);
-		pCtrl->GetImp()->CheckBanList();
-		hwid_server_enter(pCtrl->GetImp());
-	}
-	
-	return 0;
+    if(cmd_type != 711 || size < 10 || !pCtrl || !buf) return 0;
+    
+    int roleid = pCtrl->GetImp()->GetPlayerID();
+    int idx = storage_get_roleid(roleid);
+    
+    if(idx == -1 || idx < 0 || idx >= storage.size()) return 0;
+    
+    int64_t hw;
+    memcpy(&hw, &buf[2], sizeof(int64_t));
+    storage.at(idx).hwid = hw;
+    
+    printf("[HWID] Character %d with HWID %lld logged into the server\n", roleid, hw);
+    
+    // Выполняем проверку банов и сохраняем результат
+    int checkResult = pCtrl->GetImp()->CheckBanList();
+    hwid_server_enter(pCtrl->GetImp());
+    
+    // Второй лог: результат проверки блокировки
+    if (checkResult != 0) {
+        printf("[HWID] The character id - %d HWID %lld is BLACKLISTED\n", roleid, hw);
+    } else {
+        printf("[HWID] Character id - %d HWID %lld is NOT BLACKLISTED\n", roleid, hw);
+    }
+    
+    return 0;
 }
 //---------------------------------------------------------------------------------------------------------------------------
 //--патчинг функций
